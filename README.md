@@ -2,6 +2,17 @@
 
 A small Tkinter app for editing a Raspberry Pi 5 fan curve with draggable graph points, plus a systemd service that applies changes live (no reboot).
 
+## Get the files
+
+Open the [GitHub repository](https://github.com/catcontent230-dotcom/pi5-fan-curve.) or clone it directly onto your Raspberry Pi with:
+
+```bash
+git clone https://github.com/catcontent230-dotcom/pi5-fan-curve..git
+cd pi5-fan-curve.
+```
+
+Then continue with the installation steps below. This gets a copy of the project onto your Pi; it does not install or start the fan controller by itself.
+
 ## Requirements
 - Raspberry Pi 5 with Raspberry Pi OS 64-bit
 - Python 3, Tkinter, systemd
