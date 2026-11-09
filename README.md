@@ -1,134 +1,65 @@
 # Raspberry Pi 5 Fan Curve Editor
 
-A small desktop project for configuring the fan connected to the **official four-pin fan connector on a Raspberry Pi 5**.
+Fan-curve software for a Raspberry Pi 5 with a compatible fan connected to the official four-pin fan connector.
 
-There are two separate editions in this repository. Choose the one that matches your Raspberry Pi OS installation. The editions use different control methods and should not be mixed.
+**This repository contains two architecture-specific editions. Choose the one matching your installed OS — do not mix them.**
 
-## Start here — which edition should I use?
+## Choose your edition
 
-| Edition | Intended system | How it controls the fan | Reboot? |
+| Edition | Use it on | Control method | Reboot after applying? |
 |---|---|---|---|
-| **Trixie Edition** (recommended for Raspberry Pi OS Trixie) | Raspberry Pi 5, Raspberry Pi OS 64-bit based on Debian 13 Trixie | Writes the Pi 5 firmware fan-curve settings in the boot configuration | Yes |
-| **Original Edition** | Raspberry Pi 5 systems where Linux exposes the fan as a thermal cooling device | Background systemd service reads the saved curve and writes cooling-device states | No, normally |
+| **Original 32-bit Edition** | Raspberry Pi OS 32-bit (32-bit Python userspace) | systemd service controls a Linux thermal fan cooling-device interface | Normally no |
+| **Trixie 64-bit Edition — Fan Curve Studio** | Raspberry Pi OS 64-bit Trixie on Raspberry Pi 5 | Pi 5 firmware fan-curve settings in the boot config | Yes |
 
-**If you installed the current Raspberry Pi OS Trixie release, start with the Trixie Edition.** It uses the Pi 5 firmware's native fan-curve parameters. The original edition is retained for systems that expose a compatible `cooling_device` fan interface.
+The apps check the Python runtime architecture when they start. The original GUI and daemon require 32-bit Python. The Trixie GUI requires 64-bit Python.
 
-This project is for the Pi 5's supported fan interface. It is not a general-purpose GPIO fan controller and is not intended for arbitrary third-party fan wiring.
+Check your OS architecture with `getconf LONG_BIT`. A result of `32` means use the Original 32-bit Edition. A result of `64` means use the Trixie 64-bit Edition, provided you are running Raspberry Pi OS Trixie on a Pi 5.
+
+This project targets the supported Pi 5 fan connector. It is not a generic GPIO fan controller.
 
 ## Get the files
 
-The repository is public:
+[Open the public GitHub repository](https://github.com/catcontent230-dotcom/pi5-fan-curve.)
 
-- **[Open the GitHub repository](https://github.com/catcontent230-dotcom/pi5-fan-curve.)**
-- **[Open the Trixie Edition folder](https://github.com/catcontent230-dotcom/pi5-fan-curve./tree/main/trixie)**
-
-On your Raspberry Pi, open Terminal and clone the project:
+Clone it onto your Pi:
 
 ```bash
 git clone https://github.com/catcontent230-dotcom/pi5-fan-curve..git
 cd pi5-fan-curve.
 ```
 
-The clone command downloads the project files. It does not install or start either fan controller.
+The repository name itself ends with a full stop. The two full stops before `.git` in the clone URL are intentional. Cloning only downloads the files; it does not install or start a controller.
 
-The repository name includes a full stop at the end (`pi5-fan-curve.`). Keep that full stop in the clone URL and folder name.
+## Original Edition — 32-bit Raspberry Pi OS
 
----
+Use only with a 32-bit OS / 32-bit Python environment. Files: `fan_curve_editor.py` (GUI) and `fan_daemon.py` (background service).
 
-## Trixie Edition — Pi 5 Fan Curve Studio
+Requirements: Raspberry Pi 5, Raspberry Pi OS 32-bit, 32-bit Python 3, Tkinter, systemd, `pkexec`, and a fan exposed as a Linux thermal cooling device whose type contains `fan`.
 
-**Use this edition for Raspberry Pi OS 64-bit Trixie.**
+Check both the OS and Python architecture:
 
-- [Trixie Edition instructions](trixie/README.md)
-- [Trixie Edition Python application](trixie/pi5_fan_curve_trixie.py)
+```bash
+getconf LONG_BIT
+python3 -c "import struct; print(struct.calcsize('P') * 8)"
+```
 
-### Install and launch
+Both should report `32`. If either reports `64`, do not run this edition; use the Trixie 64-bit edition if you have Raspberry Pi OS Trixie.
 
-After cloning the repository:
+Install and launch from the repository root:
 
 ```bash
 sudo apt update
-sudo apt install -y python3-tk
-cd pi5-fan-curve./trixie
-python3 pi5_fan_curve_trixie.py
-```
-
-If you are already inside the cloned repository folder, just run:
-
-```bash
-sudo apt install -y python3-tk
-cd trixie
-python3 pi5_fan_curve_trixie.py
-```
-
-### What it does
-
-- Shows CPU temperature, fan RPM when the system exposes it, and the detected OS name.
-- Provides a visual fan-curve preview.
-- Lets you edit four temperature stages, PWM values (0–255), and hysteresis.
-- Checks that stage temperatures increase and fan speeds do not decrease.
-- Backs up the boot configuration before changing it.
-- Writes the Pi 5 firmware's native fan settings to `/boot/firmware/config.txt` (or `/boot/config.txt` if that is the existing file).
-
-Choose **Apply to boot config** in the app and approve the administrator prompt. **Restart the Pi** to activate the new firmware settings. Merely opening the app or editing values does not change the active fan curve.
-
-The app does not install a background service. Fan control is handled by the Pi firmware after reboot.
-
-See [trixie/README.md](trixie/README.md) for the detailed settings, backup, validation, and safety notes.
-
----
-
-## Original Edition — graph editor and background service
-
-The original edition is kept for compatible systems where the fan appears under `/sys/class/thermal/cooling_device*` and its `type` contains the word `fan`.
-
-### Requirements
-
-- Raspberry Pi 5 and a compatible fan exposed as a Linux thermal cooling device
-- Python 3
-- Tkinter
-- systemd
-- `pkexec` for the GUI's administrator prompt
-
-Install Tkinter if needed:
-
-```bash
-sudo apt update
-sudo apt install -y python3-tk
-```
-
-### Launch
-
-From the repository's top-level folder:
-
-```bash
+sudo apt install -y python3-tk policykit-1
 python3 fan_curve_editor.py
 ```
 
-In the app, choose **Install / start controller** and approve the administrator prompt. The app copies the controller files into `/opt/pi5-fan-curve`, creates a systemd service, enables it at startup, and starts it.
+In the app, click **Install / start controller** and approve the administrator prompt. It installs the daemon under `/opt/pi5-fan-curve`, creates a systemd service, enables it at startup and starts it.
 
-### Editing the curve
+Curve editing: horizontal axis is CPU temperature from 30–90°C; vertical axis is five discrete fan levels from 0–4. Drag points, click empty graph space to add, or right-click a point to remove it. At least two points are required; up to twelve are allowed. **Apply now** saves the curve. **Restore example** loads and saves the example curve.
 
-- Horizontal axis: CPU temperature from 30°C to 90°C.
-- Vertical axis: five discrete fan levels from 0 to 4.
-- Drag a point to move it.
-- Click an empty part of the graph to add a point.
-- Select a point and choose **Remove selected**, or right-click a point, to remove it.
-- At least two points are required; up to twelve are allowed.
-- **Apply now** saves the curve.
-- **Restore example** loads the example curve and saves it.
+The curve is saved at `~/.config/pi5-fan-curve/curve.json`. The daemon checks it about once per second and maps it to discrete states supported by the detected fan cooling device. Graph percentages are labels, not precise PWM percentages.
 
-The curve is stored at:
-
-```text
-~/.config/pi5-fan-curve/curve.json
-```
-
-The service checks the saved curve approximately once per second. The original edition maps the curve to the discrete states reported by the detected cooling device; the displayed level percentages are labels, not precise PWM percentages.
-
-### Check whether the original edition can see the fan
-
-Run:
+Check fan interface support:
 
 ```bash
 for d in /sys/class/thermal/cooling_device*; do
@@ -136,56 +67,55 @@ for d in /sys/class/thermal/cooling_device*; do
 done
 ```
 
-If no device with a fan type is listed, the original edition cannot control the fan through this interface on that OS/kernel. Use the Trixie Edition on a supported Trixie Pi 5 setup instead.
+If no fan cooling device appears, this edition cannot control the fan through that interface on your current OS/kernel.
 
-### Original service commands
-
-Check service status:
+Service commands:
 
 ```bash
 sudo systemctl status pi5-fan-curve.service
-```
-
-View live service logs:
-
-```bash
 sudo journalctl -u pi5-fan-curve.service -f
-```
-
-Stop and disable the service:
-
-```bash
 sudo systemctl disable --now pi5-fan-curve.service
 ```
 
-The original daemon attempts to request full fan state when it receives a normal stop signal. Do not assume this fallback works if the driver is unavailable or the system loses power.
+## Trixie Edition — 64-bit Fan Curve Studio
 
----
+Use this edition on Raspberry Pi OS 64-bit Trixie on Raspberry Pi 5.
 
-## Updating the downloaded files
+- [Trixie Edition folder](trixie/)
+- [Trixie Edition instructions](trixie/README.md)
+- [Trixie GUI source](trixie/pi5_fan_curve_trixie.py)
 
-To download later changes, open Terminal and run:
+From the repository root, install and launch:
+
+```bash
+sudo apt update
+sudo apt install -y python3-tk
+cd trixie
+python3 pi5_fan_curve_trixie.py
+```
+
+The app requires 64-bit Python and checks this when it starts. It shows CPU temperature, fan RPM if exposed by the driver, the OS name, a curve preview and four editable temperature/PWM/hysteresis stages.
+
+Click **Apply to boot config**, approve the administrator prompt and wait for the success message. The app backs up the boot config and writes the Pi 5 firmware's native fan settings. Reboot the Pi to activate the new curve. This edition does not install a background service; the Pi firmware controls the fan after reboot.
+
+## Updating your local copy
 
 ```bash
 cd pi5-fan-curve.
 git pull
 ```
 
-This updates the files in the cloned folder. It does not automatically install a new service version, apply a new curve, or change the active boot configuration. Follow the relevant edition's instructions after updating.
+This updates the files in the cloned folder. It does not automatically reinstall a service, apply a fan curve or change the active boot configuration. Follow the instructions for your edition after updating.
 
-## Safety and troubleshooting
+## Safety and testing
 
-- Check that your fan is physically connected to the Pi 5's supported fan connector.
-- Do not set fan speeds too low for your workload or cooling setup.
-- Monitor CPU temperature after changing fan settings, especially during sustained heavy use.
-- If temperature or RPM reads as unavailable, the corresponding sensor may not be exposed by the installed kernel/driver. Missing RPM telemetry alone does not prove fan control is unavailable.
-- If the GUI cannot open, check that Tkinter is installed with `sudo apt install python3-tk`.
-- If an administrator prompt does not appear, the app may not be able to use `pkexec` in your desktop session.
-- If the fan does not respond, check the edition-specific instructions and verify that the selected control interface exists on your system.
+- Confirm the fan is connected to the supported Pi 5 fan connector.
+- Do not set fan speeds too low for your workload.
+- Monitor CPU temperature under sustained load after changing settings.
+- Missing fan RPM telemetry does not necessarily mean firmware fan control is unavailable.
+- The original edition needs a detectable Linux fan cooling device. The Trixie edition needs the supported Pi 5 firmware fan parameters.
 
-## Testing status
-
-The source files have been syntax-checked, but the project has **not** been tested on the owner's physical Raspberry Pi, fan, or exact OS/kernel combination. Hardware support and behavior must be confirmed on the target Pi. Firmware, kernel, boot configuration, and fan hardware can affect the result.
+The source has been syntax-checked, but neither edition has been verified on the owner's physical Pi, fan, and exact OS/kernel/firmware combination. Hardware behavior must be tested on the target machine.
 
 ## References
 
