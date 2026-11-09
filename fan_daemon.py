@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""System service: apply the saved fan curve once per second."""
-import json, time, signal
+"""32-bit system service: apply the saved fan curve once per second."""
+import json, time, signal, struct
 from pathlib import Path
 
 THERMAL=Path("/sys/class/thermal")
@@ -40,6 +40,9 @@ def interpolate(points,temp):
     return 4
 
 def main():
+    if struct.calcsize("P") * 8 != 32:
+        print("This controller requires 32-bit Python. Use the Trixie 64-bit edition on a 64-bit OS.", flush=True)
+        return
     fan=find_fan()
     if fan is None:
         print("No fan cooling device found; check the Pi fan driver.",flush=True); return
