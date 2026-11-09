@@ -26,6 +26,7 @@ Run it on the Pi with:
 ```bash
 sudo apt update
 sudo apt install -y python3-tk
+cd trixie
 python3 pi5_fan_curve_trixie.py
 ```
 
