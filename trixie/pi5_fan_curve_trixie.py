@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Pi 5 Fan Curve Studio — Raspberry Pi OS Trixie edition.
+"""Pi 5 Fan Curve Studio — Raspberry Pi OS Trixie 64-bit edition.
 Uses the Pi 5 firmware's native fan_tempN config.txt parameters.
 """
 from __future__ import annotations
-import os, platform, re, shutil, subprocess, tempfile
+import os, platform, re, shutil, subprocess, tempfile, struct
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -210,4 +210,9 @@ class FanCurveStudio:
         self.root.after(2000,self._refresh_telemetry)
 
 if __name__=='__main__':
-    root=tk.Tk(); FanCurveStudio(root); root.mainloop()
+    root=tk.Tk()
+    if struct.calcsize('P') * 8 != 64:
+        messagebox.showerror('64-bit edition only', 'Pi 5 Fan Curve Studio requires 64-bit Python. Use the Original 32-bit Edition on a 32-bit OS.')
+        root.destroy()
+    else:
+        FanCurveStudio(root); root.mainloop()
