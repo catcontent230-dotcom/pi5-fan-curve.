@@ -1,33 +1,29 @@
-# Pi 5 Fan Curve Studio — Trixie Edition
+# Pi 5 Fan Curve Studio — Trixie 64-bit Edition
 
-A desktop application for configuring the fan curve on a **Raspberry Pi 5 using the official four-pin fan connector**. This is the newer, separate edition of the project. It does not replace or install the original edition.
+A desktop application for configuring the fan curve on a Raspberry Pi 5 running Raspberry Pi OS 64-bit Trixie, using the official four-pin fan connector.
 
-## Is this the right edition?
+**Architecture requirement: 64-bit OS and 64-bit Python.** The application checks the Python runtime and refuses to start under 32-bit Python. Use the Original 32-bit Edition in the repository root for a 32-bit OS instead.
 
-Use this edition for Raspberry Pi OS 64-bit based on Debian 13 Trixie on a Raspberry Pi 5.
+## Check your system
 
-It uses the Pi 5 firmware's native fan-curve parameters in the boot configuration. It does **not** run the original edition's polling daemon and does not write to `/sys/class/thermal/cooling_device*/cur_state`.
+```bash
+getconf LONG_BIT
+python3 -c "import struct; print(struct.calcsize('P') * 8)"
+cat /etc/os-release
+```
 
-This is not a generic GPIO fan controller. Do not assume it supports third-party fan wiring or other Raspberry Pi models.
+Both architecture checks should report `64`, and the OS should identify Raspberry Pi OS based on Debian Trixie.
 
-## Get the project
+## Get and run the project
 
-The full project is available at:
-
-https://github.com/catcontent230-dotcom/pi5-fan-curve.
-
-If you have not cloned it yet, run these commands in a terminal:
+If you have not cloned the repository yet:
 
 ```bash
 git clone https://github.com/catcontent230-dotcom/pi5-fan-curve..git
 cd pi5-fan-curve.
 ```
 
-The repository name ends with a full stop. The double full stop before `git` in the clone URL is intentional: one is the repository-name character and one is the normal separator before `git`.
-
-## Install and run
-
-From the cloned repository folder:
+Then install Tkinter and launch the app:
 
 ```bash
 sudo apt update
@@ -36,14 +32,18 @@ cd trixie
 python3 pi5_fan_curve_trixie.py
 ```
 
-If the app is already open, no install wizard or service setup is needed. It is a Tkinter application launched directly with Python.
+If you are already inside the repository's `trixie` folder, run only `python3 pi5_fan_curve_trixie.py`.
+
+## How this edition works
+
+This edition uses the Raspberry Pi 5 firmware's native fan-curve parameters in the boot configuration. It does not run the original edition's polling daemon and does not write to `/sys/class/thermal/cooling_device*/cur_state`. It is not a generic GPIO fan controller and is not intended for other Pi models or arbitrary third-party fan wiring.
 
 ## What the app shows
 
-- **CPU temperature:** refreshed approximately every two seconds from the thermal-zone sensor, if available.
-- **Fan RPM:** shown when the kernel exposes a readable `fan1_input` sensor. It may say “Not exposed” even when firmware fan control is available.
-- **Operating system:** read from `/etc/os-release`.
-- **Curve preview:** a graph of the four temperature stages and their PWM values.
+- CPU temperature, refreshed approximately every two seconds when the thermal-zone sensor is available.
+- Fan RPM when the kernel exposes a readable `fan1_input` sensor. “Not exposed” does not by itself mean fan control is unavailable.
+- Operating system name, read from `/etc/os-release`.
+- A curve preview of the four temperature stages and PWM values.
 
 ## Editing the curve
 
@@ -51,22 +51,13 @@ There are four stages. Each stage has three settings:
 
 | Setting | Meaning | Allowed values |
 |---|---|---|
-| Temperature | Temperature at which the stage's fan setting applies | 35–85°C |
+| Temperature | Temperature threshold for the stage | 35–85°C |
 | Fan power (PWM) | Raw fan PWM value | 0–255 |
 | Hysteresis | Temperature gap used to prevent rapid switching | 1–15°C |
 
-The app validates the curve before applying it:
-
-- Exactly four stages are required.
-- Temperatures must be strictly increasing.
-- Fan power must stay the same or increase at each hotter stage.
-- All values must be within the ranges above.
-
-The preview is not a live measurement of the fan's actual PWM output. It visualizes the values you have entered.
+The app requires exactly four stages, strictly increasing temperatures, and fan power that stays the same or increases at hotter stages. The preview shows the values entered; it is not a live measurement of actual fan PWM.
 
 ## Default curve
-
-The app starts with these example/default values:
 
 | Stage | Temperature | PWM | Hysteresis |
 |---|---:|---:|---:|
@@ -75,52 +66,47 @@ The app starts with these example/default values:
 | 3 | 67.5°C | 175/255 | 5°C |
 | 4 | 75°C | 250/255 | 5°C |
 
-PWM is a raw value from 0 to 255, not a percentage. **Restore defaults** loads these values into the editor only; it does not write them to the boot configuration until you choose Apply.
+PWM is a raw value from 0 to 255, not a percentage. **Restore defaults** only changes the values in the editor until you apply them.
 
 ## Apply the curve
 
-1. Enter the four stages and check the graph.
+1. Edit the four stages and check the preview.
 2. Click **Apply to boot config**.
-3. Read the confirmation prompt, which identifies the boot configuration file that will be changed.
+3. Check the confirmation prompt showing the file that will be changed.
 4. Approve the administrator prompt.
 5. Wait for the success message.
-6. Reboot the Raspberry Pi to activate the firmware settings.
+6. Reboot the Pi. The new firmware curve is not active until after reboot.
 
-The app selects `/boot/firmware/config.txt` if it exists. Otherwise it uses `/boot/config.txt`.
+The app uses `/boot/firmware/config.txt` if it exists, otherwise `/boot/config.txt`. Before the first successful edit it creates a backup alongside that file. For the usual Trixie path, the backup is `/boot/firmware/config.pi5-fan-backup`. An existing backup is not overwritten by later applies.
 
-Before the first successful edit, the app keeps a backup alongside the config file. For example, if it edits `/boot/firmware/config.txt`, the backup is `/boot/firmware/config.pi5-fan-backup`. An existing backup is not overwritten by later applies.
+The app writes a marked block with `dtparam=cooling_fan=on` and the four `fan_tempN`, `fan_tempN_hyst`, and `fan_tempN_speed` parameters. It removes existing active occurrences of these managed parameters from `dtparam=` lines while retaining unrelated entries on those lines.
 
-The app writes a clearly marked block containing `dtparam=cooling_fan=on` and the four `fan_tempN`, `fan_tempN_hyst`, and `fan_tempN_speed` settings. It removes existing active occurrences of those managed parameters from `dtparam=` lines before adding its block, while retaining unrelated entries on those lines.
+## Restore the previous boot configuration
 
-**Important:** Applying changes the boot configuration, not the currently running firmware state. The new curve is not active until the Pi has rebooted.
-
-## Undo or restore previous settings
-
-The original boot configuration backup is kept next to the edited file. To restore it, use a terminal and copy the backup back over the active config file. For the common Trixie path:
+For the usual Trixie path:
 
 ```bash
 sudo cp /boot/firmware/config.pi5-fan-backup /boot/firmware/config.txt
 sudo reboot
 ```
 
-If your app edited `/boot/config.txt` instead, use the matching backup and config paths under `/boot`.
-
-Do not delete the backup until you are happy with the fan behavior.
+If the app edited `/boot/config.txt`, use the matching backup and config paths under `/boot`. Keep the backup until you are satisfied with the fan behavior.
 
 ## Troubleshooting
 
-- **Tkinter missing:** run `sudo apt install python3-tk`.
-- **No CPU temperature:** the expected thermal-zone sensor may not be exposed; check `/sys/class/thermal/thermal_zone0/temp`.
-- **Fan RPM says “Not exposed”:** the kernel may not provide an RPM sensor. This alone does not mean firmware fan control is unavailable.
-- **Administrator prompt fails or does not appear:** the app uses `pkexec` to request permission. Check that PolicyKit authentication works in your desktop session.
-- **No change after applying:** reboot; firmware fan-curve settings are read during boot.
-- **Fan does not behave as expected after reboot:** check the selected boot config, fan connection, firmware/kernel support, and any other boot settings that may affect the fan.
+- 32-bit edition warning: check that both architecture commands above report `64`. A 32-bit OS should use the Original Edition.
+- Tkinter missing: `sudo apt install python3-tk`.
+- No CPU temperature: check `/sys/class/thermal/thermal_zone0/temp`.
+- Fan RPM unavailable: the kernel may not expose an RPM sensor; fan firmware control may still work.
+- Administrator prompt fails: the app uses `pkexec`; check PolicyKit authentication in your desktop session.
+- No change after applying: reboot; firmware settings are read during boot.
+- Unexpected fan behavior: check the boot config, fan connection, and firmware/kernel support.
 
 ## Safety and testing
 
-This application is specifically intended for the Raspberry Pi 5 supported fan interface. Keep adequate cooling for your workload. Do not use a very low curve without monitoring temperatures under sustained load.
+Keep adequate cooling for your workload and monitor CPU temperature under sustained load. This application is specifically intended for the supported Raspberry Pi 5 fan interface.
 
-The code has been syntax-checked, but it has **not** been tested on the owner's physical Pi, fan, or exact firmware/kernel combination. The application cannot guarantee that every OS image or firmware revision will accept or prioritize these settings. Monitor temperatures after applying the curve.
+The source has been syntax-checked but has not been tested on the owner's physical Pi, fan, or exact firmware/kernel combination. The app cannot guarantee every OS image or firmware revision will accept or prioritize these settings.
 
 ## References
 
