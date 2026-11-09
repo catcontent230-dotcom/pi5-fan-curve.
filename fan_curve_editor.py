@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Raspberry Pi 5 fan curve graph editor."""
-import json, subprocess, time
+"""Raspberry Pi 5 fan curve graph editor — 32-bit edition."""
+import json, subprocess, time, struct
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -134,4 +134,9 @@ class App:
         except Exception as e:messagebox.showerror("Install failed",str(e))
 
 if __name__=="__main__":
-    root=tk.Tk(); App(root); root.mainloop()
+    root=tk.Tk()
+    if struct.calcsize("P") * 8 != 32:
+        messagebox.showerror("32-bit edition only", "This original edition requires 32-bit Python. Use the Trixie Edition for 64-bit Raspberry Pi OS.")
+        root.destroy()
+    else:
+        App(root); root.mainloop()
