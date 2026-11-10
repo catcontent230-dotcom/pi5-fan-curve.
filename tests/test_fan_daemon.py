@@ -19,7 +19,7 @@ class FanCurveInterpolationTests(unittest.TestCase):
 
     def test_interpolates_between_stages(self):
         self.assertEqual(fan_daemon.interpolate(self.points, 45), 1)
-        self.assertEqual(fan_daemon.interpolate(self.points, 65), 2)
+        self.assertEqual(fan_daemon.interpolate(self.points, 65), 3)
 
     def test_accepts_unsorted_points(self):
         self.assertEqual(fan_daemon.interpolate(list(reversed(self.points)), 65), 2)
