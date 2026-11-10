@@ -68,7 +68,7 @@ def main():
             if cfg and temp is not None:
                 points=json.loads(cfg.read_text()).get("points",[])
                 if len(points)>=2:
-                    state=round(interpolate(points,temp)/4*maximum)
+                    state=int(interpolate(points,temp)/4*maximum+0.5)
                     if state!=last:
                         (fan/"cur_state").write_text(str(state)); last=state
                         print(f"{temp:.1f}°C -> state {state}/{maximum}",flush=True)
