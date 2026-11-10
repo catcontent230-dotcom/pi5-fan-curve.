@@ -115,7 +115,7 @@ This updates the files in the cloned folder. It does not automatically reinstall
 - Missing fan RPM telemetry does not necessarily mean firmware fan control is unavailable.
 - The original edition needs a detectable Linux fan cooling device. The Trixie edition needs the supported Pi 5 firmware fan parameters.
 
-The source has been syntax-checked, but neither edition has been verified on the owner's physical Pi, fan, and exact OS/kernel/firmware combination. Hardware behavior must be tested on the target machine.
+GitHub Actions now compiles both editions and runs unit tests for the original controller on every push and pull request. These automated checks do not prove hardware compatibility: neither edition has been verified on the owner's physical Pi, fan, and exact OS/kernel/firmware combination. Hardware behavior must still be tested on the target machine.
 
 ## References
 
