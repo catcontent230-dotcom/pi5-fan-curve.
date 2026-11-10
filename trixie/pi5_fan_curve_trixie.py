@@ -183,7 +183,9 @@ class FanCurveStudio:
             messagebox.showerror('Invalid values','Please enter numbers in all stage fields.'); return
         problem=validate(points)
         if problem: messagebox.showerror('Check your curve',problem); return
-        path=config_path()
+        try: path=config_path()
+        except OSError as e:
+            messagebox.showerror('Boot config not found',str(e)); return
         if not messagebox.askyesno('Apply fan curve',f'This will back up and edit:\n{path}\n\nThe Pi must reboot before the new curve takes effect. Continue?'): return
         cleaned=re.sub(re.escape(MANAGED_START)+r'.*?'+re.escape(MANAGED_END)+r'\s*','',path.read_text() if path.exists() else '',flags=re.S)
         kept=[]; target=re.compile(r'^(cooling_fan|fan_temp[0-3](?:_hyst|_speed)?)\s*=',re.I)
@@ -199,8 +201,9 @@ class FanCurveStudio:
             fd,name=tempfile.mkstemp(prefix='pi5-fan-curve-',suffix='.txt'); staged=Path(name)
             with os.fdopen(fd,'w') as handle: handle.write(new_text)
             py=("import pathlib,shutil,sys; p=pathlib.Path(sys.argv[1]); src=pathlib.Path(sys.argv[2]); "
-                "b=p.with_suffix(p.suffix+'.pi5-fan-backup'); shutil.copy2(p,b) if p.exists() and not b.exists() else None; "
-                "shutil.copyfile(src,p); shutil.copystat(b,p) if b.exists() else None")
+                "b=p.with_suffix(p.suffix+'.pi5-fan-backup'); "
+                "shutil.copy2(p,b) if not b.exists() else None; "
+                "tmp=p.with_name(p.name+'.pi5-fan-tmp'); shutil.copyfile(src,tmp); shutil.copystat(p,tmp); tmp.replace(p)")
             proc=subprocess.run(['pkexec','python3','-c',py,str(path),str(staged)],text=True,capture_output=True,timeout=60)
             if proc.returncode: raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f'pkexec exited {proc.returncode}')
         except Exception as e:
