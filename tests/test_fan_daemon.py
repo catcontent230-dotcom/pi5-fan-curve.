@@ -22,7 +22,7 @@ class FanCurveInterpolationTests(unittest.TestCase):
         self.assertEqual(fan_daemon.interpolate(self.points, 65), 3)
 
     def test_accepts_unsorted_points(self):
-        self.assertEqual(fan_daemon.interpolate(list(reversed(self.points)), 65), 2)
+        self.assertEqual(fan_daemon.interpolate(list(reversed(self.points)), 65), 3)
 
     def test_rejects_duplicate_or_too_close_temperatures(self):
         points = [{"temp": 40, "level": 0}, {"temp": 41, "level": 2}]
