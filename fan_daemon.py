@@ -50,7 +50,7 @@ def interpolate(points,temp):
         x,y=a["temp"],b["temp"]
         if x<=temp<=y:
             f=(temp-x)/(y-x)
-            return round(a["level"]+(b["level"]-a["level"])*f)
+            return int(a["level"]+(b["level"]-a["level"])*f+0.5)
     raise ValueError("Temperature could not be interpolated")
 
 def main():
