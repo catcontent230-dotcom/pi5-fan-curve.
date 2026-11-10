@@ -20,24 +20,38 @@ def find_fan():
     return None
 
 def find_config():
-    candidates=[p/".config/pi5-fan-curve/curve.json" for p in Path("/home").iterdir() if p.is_dir()]
+    candidates=[]
+    try:
+        candidates.extend(p/".config/pi5-fan-curve/curve.json" for p in sorted(Path("/home").iterdir()) if p.is_dir())
+    except OSError:
+        pass
     candidates.append(Path("/root/.config/pi5-fan-curve/curve.json"))
-    return next((p for p in candidates if p.exists()),None)
+    return next((p for p in candidates if p.is_file()),None)
 
 def temperature():
     try:return int(Path("/sys/class/thermal/thermal_zone0/temp").read_text())/1000
     except Exception:return None
 
 def interpolate(points,temp):
-    points=sorted(points,key=lambda p:float(p["temp"]))
-    if temp<=float(points[0]["temp"]):return int(points[0]["level"])
-    if temp>=float(points[-1]["temp"]):return int(points[-1]["level"])
+    if not isinstance(points,list) or not 2 <= len(points) <= 12:
+        raise ValueError("Curve must contain 2–12 points")
+    clean=[]
+    for point in points:
+        x=float(point["temp"]); level=int(point["level"])
+        if not 30 <= x <= 90 or not 0 <= level <= 4:
+            raise ValueError("Curve point is outside the supported range")
+        clean.append({"temp":x,"level":level})
+    points=sorted(clean,key=lambda p:p["temp"])
+    if any(b["temp"]-a["temp"] < 2 for a,b in zip(points,points[1:])):
+        raise ValueError("Curve temperatures must be at least 2°C apart")
+    if temp<=points[0]["temp"]:return points[0]["level"]
+    if temp>=points[-1]["temp"]:return points[-1]["level"]
     for a,b in zip(points,points[1:]):
-        x,y=float(a["temp"]),float(b["temp"])
+        x,y=a["temp"],b["temp"]
         if x<=temp<=y:
             f=(temp-x)/(y-x)
-            return round(int(a["level"])+(int(b["level"])-int(a["level"]))*f)
-    return 4
+            return round(a["level"]+(b["level"]-a["level"])*f)
+    raise ValueError("Temperature could not be interpolated")
 
 def main():
     if struct.calcsize("P") * 8 != 32:
