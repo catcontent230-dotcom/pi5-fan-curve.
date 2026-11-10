@@ -1,6 +1,6 @@
-# Raspberry Pi 5 Fan Curve Editor
+# RP5 Software
 
-Fan-curve software for a Raspberry Pi 5 with a compatible fan connected to the official four-pin fan connector.
+A collection of Raspberry Pi software projects and utilities. More tools and projects will be added here over time.
 
 **This repository contains two architecture-specific editions. Choose the one matching your installed OS — do not mix them.**
 
@@ -19,16 +19,16 @@ This project targets the supported Pi 5 fan connector. It is not a generic GPIO 
 
 ## Get the files
 
-[Open the public GitHub repository](https://github.com/catcontent230-dotcom/pi5-fan-curve.)
+[Open the public GitHub repository](https://github.com/catcontent230-dotcom/rp5-software)
 
 Clone it onto your Pi:
 
 ```bash
-git clone https://github.com/catcontent230-dotcom/pi5-fan-curve..git
-cd pi5-fan-curve.
+git clone https://github.com/catcontent230-dotcom/rp5-software.git
+cd rp5-software
 ```
 
-The repository name itself ends with a full stop. The two full stops before `.git` in the clone URL are intentional. Cloning only downloads the files; it does not install or start a controller.
+Cloning only downloads the files; it does not install or start a controller.
 
 ## Original Edition — 32-bit Raspberry Pi OS
 
@@ -107,7 +107,9 @@ git pull
 
 This updates the files in the cloned folder. It does not automatically reinstall a service, apply a fan curve or change the active boot configuration. Follow the instructions for your edition after updating.
 
-## Safety and testing
+## Testing status and safety
+
+**Important: None of the software in this repository has been tested on actual Raspberry Pi hardware or verified through testing on a real Raspberry Pi OS installation.** This includes all editions, utilities and future projects unless a particular project explicitly states otherwise. Syntax checks and automated tests are not proof that software works on a physical Pi. Treat every project as experimental, review its instructions and code before running it, and keep backups.
 
 - Confirm the fan is connected to the supported Pi 5 fan connector.
 - Do not set fan speeds too low for your workload.
@@ -115,7 +117,7 @@ This updates the files in the cloned folder. It does not automatically reinstall
 - Missing fan RPM telemetry does not necessarily mean firmware fan control is unavailable.
 - The original edition needs a detectable Linux fan cooling device. The Trixie edition needs the supported Pi 5 firmware fan parameters.
 
-GitHub Actions now compiles both editions and runs unit tests for the original controller on every push and pull request. These automated checks do not prove hardware compatibility: neither edition has been verified on the owner's physical Pi, fan, and exact OS/kernel/firmware combination. Hardware behavior must still be tested on the target machine.
+GitHub Actions is configured to compile both fan-curve editions and run unit tests for the original controller. These automated checks do not mean the software has been tested on actual Raspberry Pi hardware or a real Raspberry Pi OS installation.
 
 ## References
 
