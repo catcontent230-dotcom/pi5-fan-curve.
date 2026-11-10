@@ -101,7 +101,7 @@ Click **Apply to boot config**, approve the administrator prompt and wait for th
 ## Updating your local copy
 
 ```bash
-cd pi5-fan-curve.
+cd rp5-software
 git pull
 ```
 
