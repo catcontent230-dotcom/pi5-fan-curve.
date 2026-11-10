@@ -107,7 +107,7 @@ class FanCurveStudio:
         self._metric(cards,'OPERATING SYSTEM',self.os_value,'Detected from /etc/os-release',2,True)
         content=tk.Frame(self.root,bg=BG); content.pack(fill='both',expand=True,padx=26,pady=(0,15))
         left=tk.Frame(content,bg=PANEL,padx=18,pady=16); left.pack(side='left',fill='both',expand=True,padx=(0,12))
-        right=tk.Frame(content,bg=PANEL,padx=18,pady=16,width=330); right.pack(side='right',fill='y'); right.pack_propagate(False)
+        right=tk.Frame(content,bg=PANEL,padx=18,pady=16); right.pack(side='right',fill='both',expand=True)
         tk.Label(left,text='YOUR FAN CURVE',bg=PANEL,fg=TEXT,font=('TkDefaultFont',12,'bold')).pack(anchor='w')
         tk.Label(left,text='Four temperature stages · live preview of your settings',bg=PANEL,fg=MUTED).pack(anchor='w',pady=(4,10))
         self.graph=tk.Canvas(left,height=340,bg='#0e1628',highlightthickness=0); self.graph.pack(fill='both',expand=True)
@@ -116,7 +116,7 @@ class FanCurveStudio:
         tk.Label(right,text='STAGE SETTINGS',bg=PANEL,fg=TEXT,font=('TkDefaultFont',12,'bold')).pack(anchor='w')
         tk.Label(right,text='Adjust each point in the curve',bg=PANEL,fg=MUTED).pack(anchor='w',pady=(4,12))
         for i,p in enumerate(self.points):
-            card=tk.Frame(right,bg=PANEL2,padx=11,pady=9); card.pack(fill='x',pady=5)
+            card=tk.Frame(right,bg=PANEL2,padx=11,pady=9); card.pack(fill='both',expand=True,pady=5)
             top=tk.Frame(card,bg=PANEL2); top.pack(fill='x')
             tk.Label(top,text=f'STAGE {i+1}',bg=PANEL2,fg=CYAN,font=('TkDefaultFont',8,'bold')).pack(side='left')
             tk.Label(top,text=f'{p["speed"]}/255 PWM',bg=PANEL2,fg=TEXT,font=('TkDefaultFont',9,'bold')).pack(side='right')
