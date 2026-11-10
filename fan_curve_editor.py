@@ -9,14 +9,31 @@ CONFIG = Path.home() / ".config/pi5-fan-curve/curve.json"
 APP_DIR = Path("/opt/pi5-fan-curve")
 DEFAULT = [{"temp":40,"level":0},{"temp":50,"level":1},{"temp":60,"level":2},{"temp":67,"level":3},{"temp":75,"level":4}]
 
+def valid_points(points):
+    try:
+        if not isinstance(points, list) or not 2 <= len(points) <= 12: return False
+        cleaned=[]
+        for point in points:
+            temp=float(point["temp"]); level=int(point["level"])
+            if not 30 <= temp <= 90 or not 0 <= level <= 4: return False
+            cleaned.append({"temp":temp,"level":level})
+        cleaned.sort(key=lambda p:p["temp"])
+        return all(b["temp"]-a["temp"] >= 2 for a,b in zip(cleaned,cleaned[1:]))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
 def load_curve():
     try:
         pts=json.loads(CONFIG.read_text()).get("points", DEFAULT)
-        if len(pts)>=2: return sorted([{"temp":float(p["temp"]),"level":int(p["level"])} for p in pts],key=lambda p:p["temp"])
-    except Exception: pass
+        if valid_points(pts):
+            return sorted([{"temp":float(p["temp"]),"level":int(p["level"])} for p in pts],key=lambda p:p["temp"])
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
     return [p.copy() for p in DEFAULT]
 
 def save_curve(points):
+    if not valid_points(points):
+        raise ValueError("Curve must contain 2–12 points, temperatures 30–90°C at least 2°C apart, and fan levels 0–4.")
     CONFIG.parent.mkdir(parents=True,exist_ok=True)
     tmp=CONFIG.with_suffix(".tmp")
     tmp.write_text(json.dumps({"points":sorted(points,key=lambda p:p["temp"]),"updated":time.time()},indent=2))
@@ -112,8 +129,12 @@ class App:
         if self.selected and len(self.points)>2:self.points.remove(self.selected); self.selected=None; self.apply()
         else:self.status.set("Select a point; at least two are required")
     def apply(self):
-        self.points.sort(key=lambda p:p["temp"]); save_curve(self.points); self.draw()
-        self.status.set("Saved. The background controller reloads changes within about one second.")
+        self.points.sort(key=lambda p:p["temp"])
+        try: save_curve(self.points)
+        except (OSError, ValueError) as e:
+            self.status.set(f"Could not save curve: {e}"); return
+        self.draw()
+        self.status.set("Saved. If the controller is installed, it reloads changes within about one second.")
     def restore(self):
         if messagebox.askyesno("Restore","Restore the example fan curve?"):
             self.points=[p.copy() for p in DEFAULT]; self.selected=None; self.apply()
@@ -128,10 +149,26 @@ class App:
     def install(self):
         if not messagebox.askyesno("Install controller","Install and start the system service? Administrator permission is required."):return
         script=Path(__file__).resolve()
-        cmd=("mkdir -p /opt/pi5-fan-curve && cp '"+str(script)+"' /opt/pi5-fan-curve/fan_curve_editor.py && cp '"+str(script.parent/"fan_daemon.py")+"' /opt/pi5-fan-curve/fan_daemon.py && chmod 755 /opt/pi5-fan-curve/*.py && "
-             "printf '[Unit]\\nDescription=Pi 5 Fan Curve Controller\\nAfter=multi-user.target\\n\\n[Service]\\nType=simple\\nExecStart=/usr/bin/python3 /opt/pi5-fan-curve/fan_daemon.py\\nRestart=always\\nRestartSec=2\\n\\n[Install]\\nWantedBy=multi-user.target\\n' > /etc/systemd/system/pi5-fan-curve.service && systemctl daemon-reload && systemctl enable --now pi5-fan-curve.service")
-        try:subprocess.run(["pkexec","/bin/sh","-c",cmd],check=True); messagebox.showinfo("Installed","Controller installed and started.")
-        except Exception as e:messagebox.showerror("Install failed",str(e))
+        daemon=script.parent/"fan_daemon.py"
+        if not daemon.is_file():
+            messagebox.showerror("Install failed","fan_daemon.py must be in the same folder as this editor.")
+            return
+        installer=(
+            "import pathlib, shutil, subprocess, sys; "
+            "d=pathlib.Path('/opt/pi5-fan-curve'); d.mkdir(parents=True, exist_ok=True); "
+            "shutil.copy2(sys.argv[1], d/'fan_curve_editor.py'); "
+            "shutil.copy2(sys.argv[2], d/'fan_daemon.py'); "
+            "(d/'fan_curve_editor.py').chmod(0o755); (d/'fan_daemon.py').chmod(0o755); "
+            "u=pathlib.Path('/etc/systemd/system/pi5-fan-curve.service'); "
+            "u.write_text('[Unit]\\nDescription=Pi 5 Fan Curve Controller\\nAfter=multi-user.target\\n\\n[Service]\\nType=simple\\nExecStart=/usr/bin/python3 /opt/pi5-fan-curve/fan_daemon.py\\nRestart=always\\nRestartSec=2\\n\\n[Install]\\nWantedBy=multi-user.target\\n'); "
+            "subprocess.run(['systemctl','daemon-reload'],check=True); "
+            "subprocess.run(['systemctl','enable','--now','pi5-fan-curve.service'],check=True)"
+        )
+        try:
+            subprocess.run(["pkexec","python3","-c",installer,str(script),str(daemon)],check=True)
+            messagebox.showinfo("Installed","Controller installed and started.")
+        except (OSError, subprocess.CalledProcessError) as e:
+            messagebox.showerror("Install failed",str(e))
 
 if __name__=="__main__":
     root=tk.Tk()
