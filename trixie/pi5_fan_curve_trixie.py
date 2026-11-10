@@ -3,7 +3,7 @@
 Uses the Pi 5 firmware's native fan_tempN config.txt parameters.
 """
 from __future__ import annotations
-import os, platform, re, shutil, subprocess, tempfile, struct
+import os, platform, re, shutil, subprocess, tempfile, struct, math
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -43,7 +43,10 @@ def os_description():
     return data.get('PRETTY_NAME', platform.system())
 
 def config_path():
-    return next((p for p in CONFIG_CANDIDATES if p.exists()), CONFIG_CANDIDATES[0])
+    path=next((p for p in CONFIG_CANDIDATES if p.is_file()),None)
+    if path is None:
+        raise FileNotFoundError("Could not find /boot/firmware/config.txt or /boot/config.txt. Is the Raspberry Pi boot partition mounted?")
+    return path
 
 def make_block(points):
     lines = [MANAGED_START, '# Managed by Pi 5 Fan Curve Studio. Edit through the app.', '[all]', 'dtparam=cooling_fan=on']
@@ -57,13 +60,20 @@ def make_block(points):
 
 def validate(points):
     if len(points) != 4: return 'Exactly four fan stages are required.'
-    temps = [float(p['temp']) for p in points]
-    speeds = [int(p['speed']) for p in points]
+    try:
+        temps = [float(p['temp']) for p in points]
+        speeds = [int(p['speed']) for p in points]
+        hyst = [float(p['hyst']) for p in points]
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return 'Every stage must contain valid temperature, fan power and hysteresis numbers.'
+    if not all(math.isfinite(v) for v in temps+hyst): return 'Temperatures and hysteresis must be finite numbers.'
     if any(t < 35 or t > 85 for t in temps): return 'Temperatures must be between 35°C and 85°C.'
     if temps != sorted(temps) or len(set(temps)) != 4: return 'Each stage temperature must be higher than the previous one.'
     if any(s < 0 or s > 255 for s in speeds): return 'Fan PWM values must be between 0 and 255.'
     if speeds != sorted(speeds): return 'Fan speeds must stay the same or increase at higher temperatures.'
-    if any(float(p['hyst']) < 1 or float(p['hyst']) > 15 for p in points): return 'Hysteresis must be between 1°C and 15°C.'
+    if any(h < 1 or h > 15 for h in hyst): return 'Hysteresis must be between 1°C and 15°C.'
+    if any(hyst[i] > temps[i]-temps[i-1] for i in range(1,4)):
+        return 'Hysteresis at each stage must not exceed the temperature gap from the previous stage.'
     return None
 
 class FanCurveStudio:
