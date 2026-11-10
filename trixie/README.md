@@ -77,7 +77,7 @@ PWM is a raw value from 0 to 255, not a percentage. **Restore defaults** only ch
 5. Wait for the success message.
 6. Reboot the Pi. The new firmware curve is not active until after reboot.
 
-The app uses `/boot/firmware/config.txt` if it exists, otherwise `/boot/config.txt`. Before the first successful edit it creates a backup alongside that file. For the usual Trixie path, the backup is `/boot/firmware/config.pi5-fan-backup`. An existing backup is not overwritten by later applies.
+The app uses `/boot/firmware/config.txt` if it exists, otherwise `/boot/config.txt`. Before the first successful edit it creates a backup alongside that file. For the usual Trixie path, the backup is `/boot/firmware/config.txt.pi5-fan-backup`. An existing backup is not overwritten by later applies.
 
 The app writes a marked block with `dtparam=cooling_fan=on` and the four `fan_tempN`, `fan_tempN_hyst`, and `fan_tempN_speed` parameters. It removes existing active occurrences of these managed parameters from `dtparam=` lines while retaining unrelated entries on those lines.
 
@@ -86,7 +86,7 @@ The app writes a marked block with `dtparam=cooling_fan=on` and the four `fan_te
 For the usual Trixie path:
 
 ```bash
-sudo cp /boot/firmware/config.pi5-fan-backup /boot/firmware/config.txt
+sudo cp /boot/firmware/config.txt.pi5-fan-backup /boot/firmware/config.txt
 sudo reboot
 ```
 
