@@ -4,7 +4,9 @@
 Uses Pi 5 firmware fan-curve settings in the boot config.
 64-bit Python only — use the Trixie edition for 64-bit Raspberry Pi OS.
 Features free (non-snapping) point placement, hysteresis control, and
-a polished dark-themed UI.
+a polished dark-themed UI. Uses ONLY pack geometry manager to avoid
+TclError: cannot use geometry manager grid inside ... which already
+has slaves managed by pack.
 """
 
 import json, subprocess, time, struct, math
@@ -118,7 +120,10 @@ def cpu_temp():
 
 
 class App:
-    """Polished 64-bit Pi 5 Fan Curve Editor with free control."""
+    """Polished 64-bit Pi 5 Fan Curve Editor with free control.
+
+    Uses ONLY pack geometry manager to avoid TclError about grid/pack mixing.
+    """
 
     def __init__(self, root):
         self.root = root
@@ -145,76 +150,45 @@ class App:
         self.status = tk.StringVar(value="Ready")
         self.stats = tk.StringVar(value="Reading hardware…")
 
-        # ---- Main layout ----
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
+        # ---- Main layout using ONLY pack ----
+        # Top: control buttons bar
+        top_bar = tk.Frame(root, bg=Palette.BG, padx=16, pady=4)
+        top_bar.pack(fill="x")
 
-        main_frame = tk.Frame(root, bg=Palette.BG, padx=16, pady=16)
-        main_frame.grid(row=0, column=0, sticky="nsew")
-        main_frame.grid_rowconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=1)
+        # Canvas area - takes most space, packed left/top
+        self.canvas = tk.Canvas(root, bg=Palette.PANEL2, highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True, padx=16, pady=(0, 8))
 
-        # Left: graph area
-        left_frame = tk.Frame(main_frame, bg=Palette.PANEL, bd=0)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        left_frame.grid_rowconfigure(1, weight=1)
-        left_frame.grid_columnconfigure(0, weight=1)
+        # Right panel - hysteresis info + status
+        right_panel = tk.Frame(root, bg=Palette.PANEL2, width=320)
+        right_panel.pack(side="right", fill="y", padx=(8, 0))
+        right_panel.pack_propagate(False)
 
-        tk.Label(left_frame, text="FAN CURVE EDITOR — 64-BIT", bg=Palette.PANEL, fg=Palette.ACCENT,
-                 font=self.titlefont).pack(anchor="w", pady=(8, 4))
+        # ---- Top bar buttons ----
+        bstyle = {"bg": Palette.PANEL2, "fg": Palette.TEXT, "activebackground": Palette.ACCENT,
+                  "activeforeground": "white", "bd": 0, "font": self.nunifont}
 
-        self.canvas = tk.Canvas(left_frame, bg=Palette.PANEL2, highlightthickness=0, bd=0)
-        self.canvas.grid(row=1, column=0, sticky="nsew")
-        self.canvas.bind("<Configure>", lambda e: self.draw())
+        tk.Button(top_bar, text="⊕ Add Point", command=self._add_point_dialog, **bstyle).pack(side="left", padx=2)
+        tk.Button(top_bar, text="⊝ Remove Selected", command=self._remove_selected, **bstyle).pack(side="left", padx=2)
+        tk.Button(top_bar, text="⟳ Restore Defaults", command=self._restore_defaults, **bstyle).pack(side="left", padx=2)
+        tk.Button(top_bar, text="✅ Apply", command=self.apply, bg=Palette.ACCENT, fg="white",
+                  activebackground="#a69cff", font=self.nunifont).pack(side="right", padx=2)
+
+        # Hysteresis info label
+        tk.Label(right_panel, text="Hysteresis (°C): Prevents rapid switching near boundaries.",
+                 bg=Palette.PANEL2, fg=Palette.MUTED, font=self.nunifont).pack(anchor="w", padx=8, pady=8)
+
+        # Status at bottom of right panel
+        self.status_lbl = tk.Label(right_panel, textvariable=self.stats, bg=Palette.PANEL2, fg=Palette.MUTED,
+                                   font=self.nunifont)
+        self.status_lbl.pack(anchor="w", padx=8, pady=(0, 8))
+
+        # Bind canvas events
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<B1-Motion>", self.move)
         self.canvas.bind("<ButtonRelease-1>", self.release)
         self.canvas.bind("<Button-3>", self.delete_at)
         self.canvas.bind("<Motion>", self._mouse_move)
-
-        # Right: controls panel
-        right_frame = tk.Frame(main_frame, bg=Palette.PANEL2, width=320)
-        right_frame.grid(row=0, column=1, sticky="ns", padx=(8, 0))
-        right_frame.grid_propagate(False)
-        right_frame.grid_rowconfigure(0, weight=1)
-
-        tk.Label(right_frame, text="CURVE POINTS", bg=Palette.PANEL, fg=Palette.ACCENT,
-                 font=self.titlefont).pack(anchor="w", pady=(8, 4))
-
-        # Points list with scroll
-        list_canvas = tk.Canvas(right_frame, bg=Palette.PANEL2, highlightthickness=0, bd=0)
-        list_canvas.pack(fill="both", expand=True, padx=8, pady=4)
-        list_canvas.grid_columnconfigure(0, weight=1)
-
-        scroll = tk.Scrollbar(right_frame, orient="vertical", command=list_canvas.yview)
-        list_canvas.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y")
-
-        self.points_frame = tk.Frame(list_canvas, bg=Palette.PANEL2)
-        list_canvas.create_window((0, 0), window=self.points_frame, anchor="nw")
-        self.points_frame.bind("<Configure>", lambda e: list_canvas.configure(scrollregion=list_canvas.bbox("all")))
-
-        # Control buttons
-        btn_frame = tk.Frame(right_frame, bg=Palette.PANEL2, pady=8)
-        btn_frame.pack(fill="x", padx=8)
-
-        bstyle = {"bg": Palette.PANEL2, "fg": Palette.TEXT, "activebackground": Palette.ACCENT,
-                  "activeforeground": "white", "bd": 0, "font": self.nunifont}
-
-        tk.Button(btn_frame, text="⊕ Add Point", command=self._add_point_dialog, **bstyle).pack(fill="x", pady=2)
-        tk.Button(btn_frame, text="⊝ Remove Selected", command=self._remove_selected, **bstyle).pack(fill="x", pady=2)
-        tk.Button(btn_frame, text="⟳ Restore Defaults", command=self._restore_defaults, **bstyle).pack(fill="x", pady=2)
-        tk.Button(btn_frame, text="✅ Apply", command=self.apply, bg=Palette.ACCENT, fg="white",
-                  activebackground="#a69cff", font=self.nunifont).pack(fill="x", pady=(6, 2))
-
-        # Hysteresis explanation
-        tk.Label(right_frame, text="Hysteresis (°C): Prevents rapid switching near boundaries.",
-                 bg=Palette.PANEL2, fg=Palette.MUTED, font=self.nunifont).pack(anchor="w", padx=8, pady=(6, 2))
-
-        # Status at bottom
-        self.status_lbl = tk.Label(right_frame, textvariable=self.stats, bg=Palette.PANEL2, fg=Palette.MUTED,
-                                   font=self.nunifont)
-        self.status_lbl.pack(anchor="w", padx=8, pady=(2, 8))
 
         # Initial draw
         self.draw()
