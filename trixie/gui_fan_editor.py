@@ -122,7 +122,7 @@ def cpu_temp():
 class App:
     """Polished 64-bit Pi 5 Fan Curve Editor with free control.
 
-    Uses ONLY pack geometry manager to avoid TclError about grid/pack mixing.
+    Uses ONLY pack geometry manager — NO grid — to prevent TclError.
     """
 
     def __init__(self, root):
@@ -155,11 +155,11 @@ class App:
         top_bar = tk.Frame(root, bg=Palette.BG, padx=16, pady=4)
         top_bar.pack(fill="x")
 
-        # Canvas area - takes most space, packed left/top
+        # Canvas area — takes most space, packed left/top
         self.canvas = tk.Canvas(root, bg=Palette.PANEL2, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True, padx=16, pady=(0, 8))
 
-        # Right panel - hysteresis info + status
+        # Right panel — hysteresis info + status
         right_panel = tk.Frame(root, bg=Palette.PANEL2, width=320)
         right_panel.pack(side="right", fill="y", padx=(8, 0))
         right_panel.pack_propagate(False)
