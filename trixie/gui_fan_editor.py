@@ -47,7 +47,7 @@ def valid_points(points, enforce_spacing=True):
 
     Args:
         points: list of dicts with 'temp', 'level', 'hyst' keys.
-        enforce_spacing: if True, require ≥2°C between adjacent temps.
+        enforce_spacing: if True, require >=2°C between adjacent temps.
     """
     try:
         if not isinstance(points, list) or not 2 <= len(points) <= 12:
@@ -89,7 +89,7 @@ def save_curve(points):
     if not valid_points(points, enforce_spacing=True):
         raise ValueError(
             "Curve must contain 2–12 points, temperatures 30–90°C, "
-            "levels 0–4, and hysteresis 1–15°C. Points must be ≥2°C apart."
+            "levels 0–4, and hysteresis 1–15°C. Points must be >=2°C apart."
         )
     CONFIG.parent.mkdir(parents=True, exist_ok=True)
     tmp = CONFIG.with_suffix(".tmp")
@@ -332,110 +332,138 @@ class App:
         else:
             self.status.set("Ready")
 
-    def _add_point_dialog(self):
-        dlg = tk.Toplevel(self.root)
-        dlg.title("Add Point")
-        dlg.geometry="320x220"
-        dlg.configure(bg=Palette.PANEL)
-        dlg.transient(self.root)
-        dlg.grab_set()
-
-        f = tk.Frame(dlg, bg=Palette.PANEL, padx=20, pady=20)
-        f.pack(fill="both", expand=True)
-
-        tk.Label(f, text="Temperature (°C):", bg=Palette.PANEL, fg=Palette.TEXT, font=self.nunifont).pack(anchor="w")
-        temp_var = tk.StringVar(value="65")
-        tk.Entry(f, textvariable=temp_var, bg=Palette.PANEL2, fg=Palette.TEXT,
-                 insertbackground=Palette.TEXT, font=self.nunifont).pack(fill="x", pady=2)
-
-        tk.Label(f, text="Fan Level (0–4):", bg=Palette.PANEL, fg=Palette.TEXT, font=self.nunifont).pack(anchor="w", pady=(8, 0))
-        level_var = tk.StringVar(value="2")
-        tk.Entry(f, textvariable=level_var, bg=Palette.PANEL2, fg=Palette.TEXT,
-                 insertbackground=Palette.TEXT, font=self.nunifont).pack(fill="x", pady=2)
-
-        tk.Label(f, text="Hysteresis (°C, 1–15):", bg=Palette.PANEL, fg=Palette.TEXT, font=self.nunifont).pack(anchor="w", pady=(8, 0))
-        hyst_var = tk.StringVar(value="3")
-        tk.Entry(f, textvariable=hyst_var, bg=Palette.PANEL2, fg=Palette.TEXT,
-                 insertbackground=Palette.TEXT, font=self.nunifont).pack(fill="x", pady=2)
-
-        def ok():
-            try:
-                t = float(temp_var.get())
-                lvl = int(level_var.get())
-                h = float(hyst_var.get())
-                if not (30 <= t <= 90):
-                    raise ValueError("Temperature must be 30–90°C")
-                if not (0 <= lvl <= 4):
-                    raise ValueError("Level must be 0–4")
-                if not (1 <= h <= 15):
-                    raise ValueError("Hysteresis must be 1–15°C")
-                new_pts = self.points + [{"temp": t, "level": lvl, "hyst": h}]
-                if not valid_points(new_pts, enforce_spacing=True):
-                    messagebox.showerror("Invalid", "Points must be ≥2°C apart. Please adjust.")
-                    return
-                self.points.append({"temp": t, "level": lvl, "hyst": h})
-                self.points.sort(key=lambda p: p["temp"])
-                self.draw()
-                self._refresh_stats()
-                dlg.destroy()
-            except ValueError as ve:
-                messagebox.showerror("Invalid", str(ve))
-                return
-
-        btn_frame = tk.Frame(f, bg=Palette.PANEL)
-        btn_frame.pack(fill="x", pady=12)
-        tk.Button(btn_frame, text="Cancel", command=dlg.destroy,
-                  bg=Palette.PANEL2, fg=Palette.TEXT, font=self.nunifont).pack(side="right", padx=6)
-        tk.Button(btn_frame, text="Add", command=ok,
-                  bg=Palette.ACCENT, fg="white", font=self.nunifont).pack(side="right")
-
-        dlg.update()
-        dlg.geometry(f"+{self.root.winfo_x() + 50}+{self.root.winfo_y() + 50}")
-
-    def _remove_selected(self):
-        if self.selected is None or len(self.points) < 2:
-            messagebox.showinfo("Info", "Select a point first (click on a point in the graph).")
-            return
-        self.points.remove(self.selected)
-        self.selected = None if len(self.points) < 2 else self.points[-1]
-        self.draw()
-        self._refresh_stats()
-
-    def _restore_defaults(self):
-        if messagebox.askyesno("Restore Defaults",
-                               "Restore the default 5-point fan curve?"):
-            self.points = [p.copy() for p in DEFAULT]
-            self.selected = None
+    def click(self, e):
+        p = self.nearest(e.x, e.y)
+        if p:
+            self.selected = p
+            self.drag = True
             self.draw()
-            self._refresh_stats()
+        else:
+            temp, level = self.data(e.x, e.y)
+            self.insert(temp, level)
 
-    # ---- Actions ----
-
-    def apply(self):
-        try:
-            save_curve(self.points)
-        except ValueError as e:
-            messagebox.showerror("Save Error", str(e))
+    def move(self, e):
+        if not self.drag or not self.selected:
             return
-        self.status.set("Curve saved to ~/.config/pi5-fan-curve/curve.json")
-        self._refresh_stats()
-        messagebox.showinfo("Saved", "Fan curve saved successfully.\n\n"
-                          "The daemon checks this file every ~1 second.\n"
-                          "Restart the service for changes to take effect.")
+        temp, level = self.data(e.x, e.y)
+        pts = sorted(self.points, key=lambda p: p["temp"])
+        i = pts.index(self.selected)
+        lo = 30 if i == 0 else pts[i-1]["temp"] + 1
+        hi = 90 if i == len(pts)-1 else pts[i+1]["temp"] - 1
+        self.selected["temp"] = round(max(lo, min(hi, temp)), 1)
+        self.selected["level"] = level
+        self.draw()
 
-    def _refresh_stats(self):
-        temp = cpu_temp()
-        d = fan_device()
-        state = "Fan interface not detected"
-        if d:
-            try:
-                state = f"State: {(d/'cur_state').read_text().strip()}/{(d/'max_state').read_text().strip()}"
-            except Exception:
-                state = f"Device: {d}"
-        self.stats.set(
-            f"CPU: {temp:.1f}°C · " if temp is not None else "CPU unavailable · "
+    def release(self, e):
+        if self.drag:
+            self.drag = False
+            self.apply()
+
+    def delete_at(self, e):
+        p = self.nearest(e.x, e.y)
+        if p and len(self.points) > 2:
+            self.points.remove(p)
+            self.selected = None
+            self.apply()
+
+    def nearest(self, x, y):
+        found = [
+            (
+                ((self.xy(p)[0]-x)**2 + (self.xy(p)[1]-y)**2)**.5, p
+            )
+            for p in self.points
+        ]
+        found = [v for v in found if v[0] < 19]
+        return min(found, key=lambda v:v[0])[1] if found else None
+
+    def data(self, x, y):
+        l, r, t, b = self.bounds()
+        return max(30, min(90, 30+(x-l)/(r-l)*60)), max(0, min(4, round((b-y)/(b-t)*4)))
+
+    def bounds(self):
+        w, h = self.canvas.winfo_width(), self.canvas.winfo.height()
+        return 58, w-24, 24, h-48
+
+    def xy(self, p):
+        l, r, t, b = self.bounds()
+        return l+(p["temp"]-30)/60*(r-l), b-p["level"]/4*(b-t)
+
+
+def valid_points(points, enforce_spacing=True):
+    """Validate curve points.
+
+    Args:
+        points: list of dicts with 'temp', 'level', 'hyst' keys.
+        enforce_spacing: if True, require >=2°C between adjacent temps.
+    """
+    try:
+        if not isinstance(points, list) or not 2 <= len(points) <= 12:
+            return False
+        cleaned = []
+        for point in points:
+            temp = float(point["temp"])
+            level = int(point["level"])
+            hyst = float(point.get("hyst", 3))
+            if not 30 <= temp <= 90:
+                return False
+            if not 0 <= level <= 4:
+                return False
+            if hyst < 1 or hyst > 15:
+                return False
+            cleaned.append({"temp": temp, "level": level, "hyst": hyst})
+        cleaned.sort(key=lambda p: p["temp"])
+        if enforce_spacing:
+            return all(b["temp"] - a["temp"] >= 2 for a, b in zip(cleaned, cleaned[1:]))
+        return True
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
+
+def load_curve():
+    try:
+        pts = json.loads(CONFIG.read_text()).get("points", DEFAULT)
+        if valid_points(pts, enforce_spacing=False):
+            return sorted(
+                [{"temp": float(p["temp"]), "level": int(p["level"]), "hyst": float(p.get("hyst", 3))} for p in pts],
+                key=lambda p: p["temp"],
+            )
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return [p.copy() for p in DEFAULT]
+
+
+def save_curve(points):
+    if not valid_points(points, enforce_spacing=True):
+        raise ValueError(
+            "Curve must contain 2–12 points, temperatures 30–90°C, "
+            "levels 0–4, and hysteresis 1–15°C. Points must be >=2°C apart."
         )
-        self.root.after(1500, self._refresh_stats)
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CONFIG.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(
+            {"points": sorted(points, key=lambda p: p["temp"]), "updated": time.time()},
+            indent=2,
+        )
+    )
+    tmp.replace(CONFIG)
+
+
+def fan_device():
+    for d in Path("/sys/class/thermal").glob("cooling_device*"):
+        try:
+            if "fan" in (d / "type").read_text().strip().lower():
+                return d
+        except Exception:
+            pass
+    return None
+
+
+def cpu_temp():
+    try:
+        return int(Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000
+    except Exception:
+        return None
 
 
 if __name__ == "__main__":
